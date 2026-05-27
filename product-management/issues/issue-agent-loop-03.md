@@ -2,7 +2,7 @@
 
 **ID:** issue-agent-loop-03
 **Date:** 2026-05-27
-**Status:** Draft → SDM Review
+**Status:** Done
 
 ---
 
@@ -85,13 +85,11 @@ Run this before the first API call, not inside the loop.
 
 ## Dev Notes
 
-> To be filled during implementation.
+`run()` signature is `run(mode, repo_root, api_key, model)`. `.env` loaded in `main.py` via `load_dotenv(dotenv_path=... / ".env")`. `api_key` threaded from main.py → run() → `anthropic.Anthropic(api_key=api_key)`. Tool results collected into one list and appended as a single user-role message per turn. System Python externally managed; deps live in `.venv/` at repo root — run via `.venv/bin/python main.py`.
 
 ---
 
 ## QA Sign-Off
 
-> To be filled before GitHub push.
-
-**Verdict:** [ ] Pass  [ ] Fail
-**Findings:**
+**Verdict:** [x] Pass
+**Findings:** None. Both `python main.py triage` and `python main.py audit` completed without error. Reports written to `agent/reports/`. Tool-call streaming visible in terminal. Message format correct — no "must alternate" API errors.

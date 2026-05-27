@@ -2,7 +2,7 @@
 
 **ID:** issue-prompts-02
 **Date:** 2026-05-27
-**Status:** Draft → SDM Review
+**Status:** Done
 
 ---
 
@@ -71,13 +71,11 @@ Prompt structure for `AUDIT_SYSTEM`:
 
 ## Dev Notes
 
-> To be filled during implementation.
+`TRIAGE_SYSTEM` and `AUDIT_SYSTEM` implemented as module-level string constants. Both use `{date}` placeholder replaced at runtime via `system.replace("{date}", datetime.date.today().isoformat())` in `agent.py`. No imports in `prompts.py`. Both prompts validated end-to-end in issues 04 and 05.
 
 ---
 
 ## QA Sign-Off
 
-> To be filled before GitHub push.
-
-**Verdict:** [ ] Pass  [ ] Fail
-**Findings:**
+**Verdict:** [x] Pass
+**Findings:** None. Both prompts validated by running both modes end-to-end (issues 04 and 05). All ground truth findings surfaced on first run without prompt iteration.

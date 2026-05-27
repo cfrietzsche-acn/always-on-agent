@@ -2,7 +2,7 @@
 
 **ID:** issue-audit-e2e-05
 **Date:** 2026-05-27
-**Status:** Draft → SDM Review
+**Status:** Done
 
 ---
 
@@ -75,13 +75,20 @@ Iteration guidance if findings fail:
 
 ## Dev Notes
 
-> To be filled during implementation.
+No prompt iteration required. Agent read compliance policy first, then all 3 contracts, before writing the report. Acme governing law (California) was assessed as PASS — agent reasoned it is a recognised jurisdiction. This is the expected ambiguous outcome.
 
 ---
 
 ## QA Sign-Off
 
-> To be filled before GitHub push.
-
-**Verdict:** [ ] Pass  [ ] Fail
-**Findings:**
+**Verdict:** [x] Pass
+**Findings:** None. All acceptance criteria met:
+- Executive summary table present with all 3 vendors ✅
+- Sirius Storage: 6 violations, 5 Critical ✅
+- Sirius breach notification ("in due course") flagged Critical with no-defined-window reasoning ✅
+- Sirius data residency (Malaysia/Singapore) flagged Critical ✅
+- Sirius termination clause flagged Critical ✅
+- Acme: 3 violations including data residency (Critical) and breach notification (Critical) ✅
+- Globex: 0 violations ✅
+- All violations include verbatim contract quotes ✅
+- Report written to agent/reports/compliance-audit-2026-05-27.md ✅

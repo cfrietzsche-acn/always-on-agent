@@ -1,0 +1,5 @@
+.env
+.venv/
+agent/reports/
+__pycache__/
+*.pyc

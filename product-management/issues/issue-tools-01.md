@@ -2,7 +2,7 @@
 
 **ID:** issue-tools-01
 **Date:** 2026-05-27
-**Status:** Draft → SDM Review
+**Status:** Done
 
 ---
 
@@ -80,13 +80,15 @@ Tool-by-tool signatures:
 
 ## Dev Notes
 
-> To be filled during implementation.
+All 9 tools implemented in `agent/tools.py`. `TOOL_SCHEMAS` list and `dispatch()` included. `REPO_ROOT` is module-level None set by agent.py at startup. `write_report` uses `os.path.dirname(os.path.abspath(__file__))` to locate the reports dir correctly regardless of CWD. `requirements.txt` includes `anthropic>=0.30.0` and `python-dotenv>=1.0.0`. System Python is externally managed (PEP 668) — dependencies installed into `.venv/` at repo root.
 
 ---
 
 ## QA Sign-Off
 
-> To be filled before GitHub push.
-
-**Verdict:** [ ] Pass  [ ] Fail
-**Findings:**
+**Verdict:** [x] Pass
+**Findings:** None. Verification gate ran clean:
+- `list_issues()` returns all 5 PROD issues as summary dicts
+- `list_deploys()` returns sorted deploy array from `deploys/recent.json`
+- `read_compliance_policy()[:200]` returns policy header correctly
+All returns are strings. `dispatch()` handles unknown tool names gracefully.

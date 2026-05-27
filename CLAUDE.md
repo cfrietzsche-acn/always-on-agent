@@ -296,10 +296,14 @@ The API key lives in `.env` at the repo root (already gitignored). The key name 
 **Do not export `ANTHROPIC_API_KEY` manually — the .env handles it.**
 
 ```bash
-cd always-on-agent/agent
-pip install -r requirements.txt     # anthropic>=0.30.0, python-dotenv>=1.0.0
-python main.py triage
-python main.py audit
+# From repo root — system Python is externally managed (PEP 668); use a venv
+python3 -m venv .venv
+.venv/bin/pip install -r agent/requirements.txt
+
+# Run the agent
+cd agent
+../.venv/bin/python main.py triage
+../.venv/bin/python main.py audit
 ```
 
 The `.env` load pattern in `main.py`:
