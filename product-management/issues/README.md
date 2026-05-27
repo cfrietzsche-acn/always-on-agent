@@ -16,4 +16,8 @@ Examples: `issue-tools-01.md`, `issue-agent-loop-02.md`, `issue-triage-prompt-03
 
 | ID | Title | Status |
 |----|-------|--------|
-| *(none yet — PM creates the first issue)* | | |
+| [issue-tools-01](issue-tools-01.md) | Implement All Agent Tools | Draft → SDM Review |
+| [issue-prompts-02](issue-prompts-02.md) | Write System Prompts for Triage and Audit Modes | Draft → SDM Review |
+| [issue-agent-loop-03](issue-agent-loop-03.md) | Implement Agent Loop and CLI Entrypoint | Draft → SDM Review |
+| [issue-triage-e2e-04](issue-triage-e2e-04.md) | Validate Triage Mode End-to-End | Draft → SDM Review |
+| [issue-audit-e2e-05](issue-audit-e2e-05.md) | Validate Audit Mode End-to-End | Draft → SDM Review |
