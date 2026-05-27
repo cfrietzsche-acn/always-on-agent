@@ -1,96 +1,152 @@
-# Always-On Ops Agent — 2-Minute Pitch
+# Always-On Ops Agent — Pitch
 
 ---
 
 ## The Problem
 
-Every engineering organization has two recurring time sinks that happen at the worst possible moments:
+Engineering and legal teams face two recurring time sinks that hit at the worst possible moments.
 
-**Incident triage at 3am.** An on-call engineer wakes up to five open production tickets. They spend 45 minutes manually cross-referencing issue bodies, deploy logs, and runbooks — trying to figure out which two tickets are actually the same problem, which deploy broke what, and whether rolling back is even an option. By the time they have a hypothesis, the customer has already escalated.
+**Incident triage at 3am.** An on-call engineer wakes up to five open production tickets with no assigned severity, no context, and no obvious connection between them. They spend 45 minutes manually cross-referencing issue bodies, deploy logs, and runbooks — trying to figure out which two tickets are actually the same problem, which deploy broke what, and whether rolling back is even an option. By the time they have a hypothesis, the customer has already escalated. And the answer was sitting in the data the whole time.
 
-**Legal review of vendor contracts.** A contract renewal comes up or a risk review is scheduled. Someone manually reads three vendor agreements against a compliance policy checklist. It takes a lawyer 2+ hours, human error is common, and the "in due course" breach notification clause that violates GDPR Article 33 gets missed — until it doesn't.
+**Vendor contract compliance.** A contract renewal comes up or a risk review is scheduled. Someone manually reads three vendor agreements against a compliance checklist. It takes a lawyer two or more hours, human error is common, and the breach notification clause that says "in due course" — a direct GDPR Article 33 violation — gets missed. Until it doesn't.
 
-Both problems share the same root cause: **they're pattern-matching across structured data, and humans are slow at it.**
-
----
-
-## What We Built
-
-An always-on enterprise ops agent that runs two autonomous modes against your existing repository data — no new infrastructure, no schema changes.
-
-**Triage mode:** The agent reads every open incident, correlates them against your deploy history within a 48-hour window, cross-references your runbooks, and produces a cited, ranked report. It surfaces connections a human would miss — like two separate ticket numbers that are actually the same NPE triggered by a feature flag that went live 21 minutes before the customer complaint.
-
-**Audit mode:** The agent reads your vendor contracts against your compliance policy and produces a violation report with verbatim contract quotes, risk levels, and remediation steps. It catches the clauses that say "in due course" where your policy requires 72 hours — the kind of thing that causes GDPR exposure.
-
-**Both modes run in under 90 seconds.** On the same data that's already in your repo.
+Both problems share the same root cause: **they are pattern-matching across structured data, and humans are slow at it, especially under pressure.**
 
 ---
 
-## Why It Matters
+## How We Approached It
 
-This isn't a demo of AI generating text. This is AI doing work that currently requires a senior engineer with 45 minutes of uninterrupted focus, or a contract lawyer with 2 hours and a checklist.
+We started with a synthetic enterprise ops repository that mirrors what a real engineering org already has: open incident tickets, recent deploy logs, diagnostic runbooks, vendor contracts, and a compliance policy. No new schema. No database. No integration work.
 
-Three things make this different from a chatbot:
+We built a Claude-powered agent that reads this data autonomously, reasons across it, and writes a cited report. The agent is not given rules or lookup tables. It decides which files to read, in what order, and what the connections mean — the same way a skilled engineer would, except it takes 90 seconds instead of 45 minutes.
 
-1. **It reads everything before it concludes.** Every issue body. Every deploy. Every runbook. It doesn't hallucinate — it cites the specific file, field, and timestamp behind every finding.
-
-2. **It surfaces connections, not summaries.** The agent found that PROD-4487 and PROD-4521 — two separate ticket numbers — share the same root cause at `PaymentService.java:142`, triggered by a guest-checkout feature flag that went live for one customer cohort. A human reading tickets in order would likely triage them separately.
-
-3. **It writes a report as its final act.** Not a chat response. A persistent markdown artifact that your on-call engineer can act on, your legal team can review, and your post-mortem can reference.
+The architecture is a standard Anthropic tool-use loop: the agent calls file-reading tools, receives the data, reasons across it, calls more tools as needed, and writes its findings as a persistent report. The reasoning streams live to the terminal so you can follow along in real time.
 
 ---
 
-## The Demo in 90 Seconds
+## What the Demo Shows
 
-```
-$ python main.py triage
-  → list_issues()
-  → read_issue(PROD-4487) ... read_issue(PROD-4521)
-  → list_deploys()
-  → search_runbook(payment-service-degraded)
-  → write_report(triage-2026-05-27.md)
+Run one command:
+
+```bash
+python main.py demo
 ```
 
-Open the report. PROD-4487 and PROD-4521 are linked — same root cause, two deploys, fix is a null check at one line of code. On-call engineer has a confirmed hypothesis in 90 seconds instead of 45 minutes.
+### Act 1 — Incident Triage
 
-```
-$ python main.py audit
-  → read_compliance_policy()
-  → read_contract(sirius-storage)
-  → write_report(compliance-audit-2026-05-27.md)
-```
+The terminal begins streaming the agent's reasoning word-by-word as it works. You watch it:
 
-Open the report. Sirius Storage: 6 violations, 5 Critical. Breach notification says "in due course" — no defined window. That's a GDPR Article 33 timebomb. Flagged. Quoted verbatim. Remediation suggested.
+- Call `list_issues()` — five open PROD incidents appear, none with assigned severity
+- Call `read_issue()` on each one — reading every body before forming any hypothesis
+- Call `list_deploys()` — pulling the full deploy history and calculating timestamp deltas
+- Call `search_runbook()` for the services involved — pulling the diagnostic playbooks
+- Reason across all of it and call `write_report()` as its final act
+
+**What the output shows:**
+
+PROD-4487 and PROD-4521 are two separate ticket numbers — a customer complaint and an NPE alert — that the agent identifies as the same cascading failure. The payment-service deploy at 14:04 introduced a null-pointer exception. The tenant-config-service deploy at 07:12 the next morning activated the guest-checkout feature flag for the affected customer cohort. Twenty-one minutes later, the customer complaint opened. The agent traces this from timestamps alone, with no hardcoded rules, and recommends an immediate rollback of the config deploy and a null-check fix at `PaymentService.java:142` before re-enabling the feature.
+
+A separate upload latency issue is traced to the signing-service reducing a URL TTL from 3600 seconds to 300 — a security change that caused pre-signed URLs to expire mid-upload. An auth issue is flagged for DB connection pool exhaustion with the exact config key to change. A feature request is correctly classified P3 with no deploy correlation and no action required.
+
+**The finding a human would miss:** the two checkout incidents are the same problem disguised as two tickets. The agent finds it in 90 seconds. An on-call engineer, reading tickets sequentially at 3am, typically would not.
+
+Press Enter to continue to Act 2.
+
+### Act 2 — Compliance Audit
+
+Same agent, new mode. You watch it:
+
+- Call `read_compliance_policy()` first — reads every rule before opening any contract
+- Call `read_contract()` on each vendor agreement — reads in full
+- Evaluate every clause against every rule
+- Write a report with verbatim quotes and risk levels
+
+**What the output shows:**
+
+An executive summary table: Sirius Storage has six violations, five of them Critical. Acme Data Platform has three. Globex is fully compliant. Then the per-vendor detail — each violation quoted verbatim from the contract, rated by risk, with a specific remediation.
+
+The Sirius Storage breach notification clause reads: *"Sirius will notify the customer of confirmed security incidents in due course, taking into account the nature and circumstances of the incident."* No defined window. The agent flags this Critical and calls it what it is: a GDPR Article 33 violation. The compliance policy requires 72 hours. "In due course" is not a timeline.
+
+The Sirius termination clause prohibits termination for convenience during the initial five-year term. The liability cap is three months of fees — the policy minimum is twelve. The audit rights clause requires 180 days' notice, against a policy maximum of 90. Every violation is quoted, not paraphrased.
+
+**The finding a human would miss:** Sirius Storage has six violations across seven policy rules. In a manual review, it is common to catch the headline issues and miss the subprocessor and governing-law clauses. The agent evaluates every rule against every contract and leaves nothing unchecked.
+
+### After the demo ends
+
+Two report files sit in `agent/reports/`:
+
+- `triage-YYYY-MM-DD.md` — ranked incident findings with root causes, contributing deploys, and specific fixes
+- `compliance-audit-YYYY-MM-DD.md` — violation table with verbatim quotes, risk levels, and remediation steps
+
+These are not chat responses. They are persistent artifacts an on-call engineer can act on immediately, a legal team can attach to a contract review, and a post-mortem can reference six months later.
 
 ---
 
-## What Comes Next
+## The Always-On Loop
 
-### Next Sprint — Make it real-time (P1)
+The demo also runs as a continuous loop — the "always-on" proof:
 
-| Feature | What it unlocks |
+**Terminal 1:**
+```bash
+python main.py watch
+```
+Monitors `issues/` for new ticket files. When one appears, it triages it automatically.
+
+**Terminal 2:**
+```bash
+python main.py generate --loop
+```
+Drops a new synthetic incident every 60 seconds, each paired with a matching deploy that arrived 15-20 minutes before the ticket. Scenarios cycle through: payment NPE spreading to new tenants, auth service memory leak, Stripe webhook failures, job queue backup, CDN cache cascade.
+
+The watch terminal detects each new file, runs a focused triage, finds the deploy correlation, matches the runbook, and writes a per-ticket report — automatically, continuously, without a human in the loop.
+
+---
+
+## How This Would Actually Help
+
+**For engineering:** The agent becomes the first responder on every incident. Before a human picks up the page, the agent has already correlated the ticket to a deploy, matched it to a runbook, and produced a starting hypothesis with cited evidence. The on-call engineer starts with a confirmed direction instead of a blank page. Mean time to hypothesis drops from 45 minutes to under 2 minutes.
+
+**For legal and compliance:** Every vendor contract is audited against every policy rule on a schedule, not on a deadline. Contract renewals, new vendor onboarding, and annual risk reviews become agent-triggered reports rather than manual exercises. Violations are caught before they become incidents, not after.
+
+**For leadership:** The agent's output is auditable. Every finding traces back to a specific file, field, timestamp, or verbatim clause. There is no black box. When the agent says a contract violates GDPR Article 33, it shows you the exact sentence in the contract and the exact rule it violates.
+
+---
+
+## What We Would Build Next
+
+### Already done — MVP
+
+- Autonomous triage across incidents, deploys, and runbooks
+- Autonomous compliance audit across vendor contracts and policy
+- Streaming output — reasoning visible in real time
+- Watch mode — auto-triage on new ticket arrival
+- Ticket generator — continuous demo loop
+
+### Next sprint — Production hardening (P1)
+
+| Feature | Why it matters |
 |---------|----------------|
-| **File-watcher / watch mode** | Drop a new `PROD-XXXX.json` file and the agent triages it automatically — this is the "always-on" part of the name |
-| **Streaming output** | Reasoning streams word-by-word to the terminal — dramatically more impressive live and faster to act on |
-| **Prompt caching** | Policy and contracts cached across runs — ~90% cost reduction on repeated audit runs |
-| **Eval harness** | Automated assertions on known correlations — prevents prompt regressions as you iterate |
+| Prompt caching on policy + contracts | ~90% cost reduction on repeated audit runs — policy never changes between runs |
+| Eval harness with fixture assertions | Prevents prompt regressions as the system evolves — known correlations are automatically verified |
+| Retry and error handling | Production resilience — current loop has no retry on transient API errors |
+| Per-run cost and latency logging | Needed before any production deployment — visibility into what each run costs |
 
-### Next Phase — Connect to your actual stack (P2)
+### Next phase — Connect to real systems (P2)
 
-| Feature | What it unlocks |
+| Feature | Why it matters |
 |---------|----------------|
-| **Live incident feed** | Replace synthetic JSON with PagerDuty or Jira webhooks — real incidents, real-time |
-| **Slack / Teams notification** | Agent routes findings directly to your on-call channel instead of writing a file |
-| **Multi-agent architecture** | Specialist triage agent + specialist audit agent orchestrated by a router — parallel analysis, faster results |
-| **Human-in-the-loop for P0s** | Agent proposes action, human approves before execution — safe automation at the sharp end |
-| **Persistent memory** | Agent remembers prior triage findings and doesn't re-investigate incidents it already closed |
+| Live incident feed via PagerDuty or Jira webhook | Moves from synthetic data to real production incidents — the agent becomes operational |
+| Slack or Teams notification tool | Agent routes findings to the on-call channel instead of writing a file — closes the action loop |
+| Multi-agent architecture | Triage agent and audit agent run in parallel, orchestrated by a router — faster results, cleaner separation |
+| Human-in-the-loop approval for P0 actions | Agent proposes remediation, human approves before execution — safe automation at the sharp end |
+| Persistent memory across runs | Agent remembers what it already investigated and doesn't re-triage closed incidents |
 
-### 6-Month Vision
+### Six-month vision
 
-An always-on enterprise ops intelligence layer that continuously monitors incident feeds, deploy pipelines, and contract repositories. It proactively surfaces risk before humans notice. It generates and routes remediation tickets. It becomes the connective tissue between on-call, legal, and engineering — the institutional memory that doesn't go home at 5pm.
+An always-on enterprise intelligence layer that monitors incident feeds, deploy pipelines, and contract repositories continuously. It surfaces risk before humans notice it. It generates and routes remediation tickets. It builds institutional memory that persists across team changes, on-call rotations, and contract cycles.
 
-The path from here to there is linear: **MVP proves the reasoning works → P1 proves it works in real-time → P2 proves it integrates with the stack you already have.**
+The path is linear: **the MVP proves the reasoning works. P1 proves it works at production scale. P2 proves it integrates with the stack you already have.**
 
 ---
 
-*Always-On Ops Agent — built at the BTS AI Hackathon, May 2026*
+*Always-On Ops Agent — BTS AI Hackathon, May 2026*
