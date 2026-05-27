@@ -7,7 +7,7 @@ import time
 
 from dotenv import load_dotenv
 
-VALID_MODES = ("triage", "audit", "watch", "generate")
+VALID_MODES = ("triage", "audit", "watch", "generate", "demo")
 
 
 def load_config():
@@ -25,10 +25,11 @@ def load_config():
 
 def main():
     if len(sys.argv) < 2 or sys.argv[1] not in VALID_MODES:
-        print("Usage: python main.py [triage|audit|watch|generate]")
+        print("Usage: python main.py [triage|audit|demo|watch|generate]")
         print()
         print("  triage    — triage all open incidents and write a report")
         print("  audit     — audit all vendor contracts and write a report")
+        print("  demo      — run triage then audit back-to-back (full live demo)")
         print("  watch     — poll issues/ for new tickets and auto-triage each one")
         print("  generate  — drop a synthetic ticket into issues/ (use --loop to repeat)")
         sys.exit(1)
@@ -54,8 +55,48 @@ def main():
         from agent import run
         run(mode, repo_root, api_key)
 
+    elif mode == "demo":
+        _demo(api_key, repo_root)
+
     elif mode == "watch":
         _watch(api_key, repo_root)
+
+
+def _banner(text: str):
+    width = 60
+    print("\n" + "─" * width)
+    print(f"  {text}")
+    print("─" * width + "\n")
+
+
+def _demo(api_key: str, repo_root: str):
+    import datetime
+    from agent import run
+
+    reports_dir = pathlib.Path(__file__).parent / "reports"
+    today = datetime.date.today().isoformat()
+
+    _banner("ACT 1 OF 2 — INCIDENT TRIAGE")
+    print("  5 open PROD incidents. No assigned severity. No context.")
+    print("  Watch the agent correlate across incidents, deploys, and runbooks.\n")
+    run("triage", repo_root, api_key)
+    triage_report = reports_dir / f"triage-{today}.md"
+    if triage_report.exists():
+        print(f"\n  Report written → {triage_report}\n")
+
+    input("\n  Press Enter to continue to Act 2...\n")
+
+    _banner("ACT 2 OF 2 — COMPLIANCE AUDIT")
+    print("  3 vendor contracts. 8 policy rules.")
+    print("  Watch the agent read every clause and flag every violation verbatim.\n")
+    run("audit", repo_root, api_key)
+    audit_report = reports_dir / f"compliance-audit-{today}.md"
+    if audit_report.exists():
+        print(f"\n  Report written → {audit_report}\n")
+
+    _banner("DEMO COMPLETE")
+    print(f"  Triage report  → {triage_report}")
+    print(f"  Audit report   → {audit_report}\n")
 
 
 def _watch(api_key: str, repo_root: str, poll_interval: int = 5):
