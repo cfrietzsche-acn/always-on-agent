@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Always-On Ops Agent</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface2: #21262d;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --orange: #e3b341;
+      --red: #f85149;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .brand { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+
+    .pulse {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--green); animation: blink 2s infinite;
+    }
+    .pulse.running { background: var(--orange); animation: none; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+    .status-badge {
+      font-size: 11px; color: var(--muted);
+      background: var(--surface2); border: 1px solid var(--border);
+      padding: 3px 8px; border-radius: 10px;
+    }
+
+    .spacer { flex: 1; }
+
+    .btn {
+      padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border);
+      font-size: 12px; font-weight: 500; cursor: pointer;
+      background: var(--surface2); color: var(--text); transition: all .15s;
+    }
+    .btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .btn.primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+    .btn.primary:hover:not(:disabled) { opacity: .85; }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* ── Layout ─────────────────────────────────────────────────────────── */
+    .layout {
+      display: grid;
+      grid-template-columns: 260px 1fr 400px;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ─────────────────────────────────────────────────────────── */
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+
+    .tab-bar {
+      display: flex; border-bottom: 1px solid var(--border);
+      flex-shrink: 0; overflow-x: auto;
+    }
+    .tab {
+      padding: 8px 11px; font-size: 11px; cursor: pointer; white-space: nowrap;
+      border-bottom: 2px solid transparent; color: var(--muted);
+      transition: color .15s; user-select: none;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    .sidebar-list { flex: 1; overflow-y: auto; padding: 8px; }
+
+    .resource-card {
+      padding: 9px 11px; border-radius: 6px; cursor: pointer;
+      margin-bottom: 3px; transition: background .1s;
+      border: 1px solid transparent;
+    }
+    .resource-card:hover { background: var(--surface2); }
+    .resource-card.active { background: var(--surface2); border-color: var(--accent); }
+
+    .card-id { font-size: 10px; font-family: monospace; color: var(--accent); font-weight: 600; }
+    .card-title {
+      font-size: 12px; color: var(--text); margin-top: 3px; line-height: 1.4;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .card-meta { display: flex; align-items: center; gap: 5px; margin-top: 5px; flex-wrap: wrap; }
+    .card-time { font-size: 10px; color: var(--muted); }
+
+    .badge {
+      font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;
+      text-transform: uppercase; letter-spacing: .4px; white-space: nowrap;
+    }
+    .badge-p1 { background: rgba(248,81,73,.15); color: var(--red); }
+    .badge-p2 { background: rgba(227,179,65,.15); color: var(--orange); }
+    .badge-p3 { background: rgba(139,148,158,.15); color: var(--muted); }
+    .badge-open { background: rgba(63,185,80,.15); color: var(--green); }
+    .badge-label { background: rgba(88,166,255,.1); color: var(--accent); }
+    .badge-no-rollback { background: rgba(248,81,73,.2); color: var(--red); font-weight: 700; }
+    .badge-rollback { background: rgba(63,185,80,.15); color: var(--green); }
+
+    .deploy-card {
+      padding: 9px 11px; border-radius: 6px; margin-bottom: 4px;
+      border: 1px solid var(--border); background: var(--surface2);
+    }
+    .deploy-top { display: flex; align-items: center; justify-content: space-between; }
+    .deploy-service { font-size: 12px; font-weight: 600; color: var(--text); }
+    .deploy-version { font-size: 11px; font-family: monospace; color: var(--accent); }
+    .deploy-summary { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+
+    /* ── Viewer ───────────────────────────────────────────────────────────── */
+    .viewer {
+      overflow: hidden; display: flex; flex-direction: column;
+      border-right: 1px solid var(--border);
+    }
+
+    .viewer-header {
+      padding: 9px 16px; border-bottom: 1px solid var(--border);
+      font-size: 12px; color: var(--muted); flex-shrink: 0;
+      background: var(--surface); white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .viewer-body { flex: 1; overflow-y: auto; padding: 20px 24px; }
+
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; height: 100%; gap: 12px; color: var(--muted); text-align: center;
+    }
+    .empty-icon { font-size: 40px; opacity: .3; }
+    .empty-hint { font-size: 13px; color: var(--accent); cursor: pointer; }
+    .empty-hint:hover { text-decoration: underline; }
+
+    /* Markdown */
+    .md h1 { font-size: 19px; color: var(--text); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    .md h2 { font-size: 15px; color: var(--text); margin: 20px 0 8px; }
+    .md h3 { font-size: 13px; color: var(--text); margin: 14px 0 6px; }
+    .md p { font-size: 13px; line-height: 1.7; color: var(--text); margin-bottom: 10px; }
+    .md ul, .md ol { padding-left: 20px; margin-bottom: 10px; }
+    .md li { font-size: 13px; line-height: 1.7; color: var(--text); margin-bottom: 3px; }
+    .md code { font-family: monospace; font-size: 12px; background: var(--surface2); padding: 2px 5px; border-radius: 3px; color: var(--accent); }
+    .md pre { background: var(--surface2); padding: 12px; border-radius: 6px; overflow-x: auto; margin-bottom: 12px; }
+    .md pre code { background: none; padding: 0; color: var(--text); font-size: 12px; }
+    .md table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+    .md th { text-align: left; padding: 7px 12px; border-bottom: 2px solid var(--border); color: var(--muted); font-size: 11px; text-transform: uppercase; }
+    .md td { padding: 7px 12px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text); }
+    .md strong { color: var(--text); font-weight: 600; }
+    .md em { color: var(--muted); }
+    .md blockquote { border-left: 3px solid var(--border); padding-left: 12px; color: var(--muted); margin-bottom: 10px; }
+    .md hr { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
+    .md a { color: var(--accent); }
+
+    /* ── Terminal ─────────────────────────────────────────────────────────── */
+    .terminal-panel { display: flex; flex-direction: column; background: #090c10; overflow: hidden; }
+
+    .terminal-header {
+      padding: 9px 16px; border-bottom: 1px solid var(--border);
+      font-size: 12px; color: var(--muted); display: flex;
+      align-items: center; justify-content: space-between;
+      flex-shrink: 0; background: var(--surface);
+    }
+    .terminal-header-left { display: flex; align-items: center; gap: 8px; }
+
+    .clear-btn {
+      font-size: 11px; color: var(--muted); cursor: pointer;
+      background: none; border: none; padding: 2px 4px;
+    }
+    .clear-btn:hover { color: var(--text); }
+
+    .terminal {
+      flex: 1; overflow-y: auto; padding: 12px 14px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 12px; line-height: 1.65; white-space: pre-wrap; word-break: break-word;
+    }
+    .t-text { color: #c9d1d9; }
+    .t-tool { color: var(--accent); }
+    .t-result { color: #6e7681; font-size: 11px; }
+    .t-done { color: var(--green); font-weight: 600; }
+    .t-error { color: var(--red); }
+    .t-meta { color: #484f58; }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="pulse" id="pulse"></div>
+    Always-On Ops Agent
+  </div>
+  <span class="status-badge" id="status">Idle</span>
+  <div class="spacer"></div>
+  <button class="btn" id="btn-triage" onclick="runAgent('triage')">⚡ Run Triage</button>
+  <button class="btn" id="btn-audit" onclick="runAgent('audit')">📋 Run Audit</button>
+  <button class="btn primary" id="btn-demo" onclick="runDemo()">▶ Run Full Demo</button>
+</header>
+
+<div class="layout">
+
+  <!-- ── Sidebar ────────────────────────────────────────────────────────── -->
+  <div class="sidebar">
+    <div class="tab-bar">
+      <div class="tab active" id="tab-issues"     onclick="switchTab('issues')">Issues</div>
+      <div class="tab"        id="tab-runbooks"   onclick="switchTab('runbooks')">Runbooks</div>
+      <div class="tab"        id="tab-contracts"  onclick="switchTab('contracts')">Contracts</div>
+      <div class="tab"        id="tab-deploys"    onclick="switchTab('deploys')">Deploys</div>
+      <div class="tab"        id="tab-reports"    onclick="switchTab('reports')">Reports</div>
+    </div>
+    <div class="sidebar-list" id="sidebar-content">
+      <div style="padding:12px;color:var(--muted);font-size:12px">Loading...</div>
+    </div>
+  </div>
+
+  <!-- ── Viewer ─────────────────────────────────────────────────────────── -->
+  <div class="viewer">
+    <div class="viewer-header" id="viewer-title">Select a resource to view</div>
+    <div class="viewer-body" id="viewer-body">
+      <div class="empty-state">
+        <div class="empty-icon">⚡</div>
+        <div style="font-size:13px">Select a resource on the left, or</div>
+        <div class="empty-hint" onclick="runDemo()">run the full demo to see live findings →</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Terminal ───────────────────────────────────────────────────────── -->
+  <div class="terminal-panel">
+    <div class="terminal-header">
+      <div class="terminal-header-left">
+        <span>Agent Output</span>
+      </div>
+      <button class="clear-btn" onclick="clearTerminal()">clear</button>
+    </div>
+    <div class="terminal" id="terminal"><span class="t-meta">Agent ready. Click Run Triage, Run Audit, or Run Full Demo.
+
+</span></div>
+  </div>
+
+</div>
+
+<script>
+  // ── State ────────────────────────────────────────────────────────────────
+  let currentTab = 'issues';
+  let isRunning  = false;
+  let afterRun   = null;
+
+  // ── Boot ─────────────────────────────────────────────────────────────────
+  window.addEventListener('DOMContentLoaded', () => loadTab('issues'));
+
+  // ── Tabs ──────────────────────────────────────────────────────────────────
+  function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(`tab-${tab}`).classList.add('active');
+    loadTab(tab);
+  }
+
+  async function loadTab(tab) {
+    const el = document.getElementById('sidebar-content');
+    el.innerHTML = '<div style="padding:12px;color:var(--muted);font-size:12px">Loading...</div>';
+    try {
+      if      (tab === 'issues')    await renderIssues(el);
+      else if (tab === 'runbooks')  await renderRunbooks(el);
+      else if (tab === 'contracts') await renderContracts(el);
+      else if (tab === 'deploys')   await renderDeploys(el);
+      else if (tab === 'reports')   await renderReports(el);
+    } catch(e) {
+      el.innerHTML = `<div style="padding:12px;color:var(--red);font-size:12px">Error: ${e.message}</div>`;
+    }
+  }
+
+  // ── Severity inference ────────────────────────────────────────────────────
+  function severity(issue) {
+    const l = issue.labels || [];
+    if (l.includes('customer-impact') || l.includes('payment')) return 'P1';
+    if (l.includes('service-health') || l.includes('performance') ||
+        l.includes('infrastructure') || l.includes('third-party')) return 'P2';
+    return 'P3';
+  }
+
+  // ── Issues ────────────────────────────────────────────────────────────────
+  async function renderIssues(el) {
+    const issues = await fetchJSON('/api/issues');
+    el.innerHTML = '';
+    issues.forEach(issue => {
+      const sev = severity(issue);
+      const sevCls = sev === 'P1' ? 'badge-p1' : sev === 'P2' ? 'badge-p2' : 'badge-p3';
+      const date = new Date(issue.opened_at).toLocaleDateString();
+      const card = el.appendChild(mkCard());
+      card.innerHTML = `
+        <div class="card-id">${issue.id}</div>
+        <div class="card-title">${esc(issue.title)}</div>
+        <div class="card-meta">
+          <span class="badge ${sevCls}">${sev}</span>
+          <span class="badge badge-open">open</span>
+          ${(issue.labels||[]).map(l=>`<span class="badge badge-label">${esc(l)}</span>`).join('')}
+        </div>
+        <div class="card-time">${date}</div>`;
+      card.onclick = () => { activate(card); viewIssue(issue); };
+    });
+  }
+
+  function viewIssue(i) {
+    const md = `# ${i.id}\n\n**${i.title}**\n\n---\n\n` +
+      `**Status:** ${i.status}  \n**Opened:** ${i.opened_at}  \n` +
+      `**Reporter:** ${i.reporter}  \n**Labels:** ${(i.labels||[]).join(', ')||'none'}\n\n---\n\n` +
+      `## Description\n\n${i.body}`;
+    setViewer(`${i.id} — ${i.title}`, md);
+  }
+
+  // ── Runbooks ──────────────────────────────────────────────────────────────
+  async function renderRunbooks(el) {
+    const list = await fetchJSON('/api/runbooks');
+    el.innerHTML = '';
+    list.forEach(rb => {
+      const card = el.appendChild(mkCard());
+      card.innerHTML = `<div class="card-id">Runbook</div>
+        <div class="card-title">${esc(rb.name.replace(/-/g,' '))}</div>`;
+      card.onclick = () => { activate(card); setViewer(rb.name, rb.content); };
+    });
+  }
+
+  // ── Contracts ─────────────────────────────────────────────────────────────
+  async function renderContracts(el) {
+    const list = await fetchJSON('/api/contracts');
+    el.innerHTML = '';
+    list.forEach(c => {
+      const card = el.appendChild(mkCard());
+      card.innerHTML = `<div class="card-id">Contract</div>
+        <div class="card-title">${esc(c.name.replace(/-/g,' '))}</div>`;
+      card.onclick = () => { activate(card); setViewer(c.name, c.content); };
+    });
+
+    // Also show compliance policy link
+    const policyCard = el.appendChild(mkCard());
+    policyCard.innerHTML = `<div class="card-id">Policy</div>
+      <div class="card-title">Vendor Compliance Policy</div>`;
+    policyCard.onclick = async () => {
+      activate(policyCard);
+      const data = await fetchJSON('/api/policy');
+      setViewer('Compliance Policy', data.content);
+    };
+  }
+
+  // ── Deploys ───────────────────────────────────────────────────────────────
+  async function renderDeploys(el) {
+    const deploys = await fetchJSON('/api/deploys');
+    el.innerHTML = '';
+    deploys.forEach(d => {
+      const div = document.createElement('div');
+      div.className = 'deploy-card';
+      const rb = d.rollback_available
+        ? '<span class="badge badge-rollback">rollback ok</span>'
+        : '<span class="badge badge-no-rollback">NO ROLLBACK</span>';
+      div.innerHTML = `
+        <div class="deploy-top">
+          <span class="deploy-service">${esc(d.service)}</span>
+          <span class="deploy-version">${esc(d.version)}</span>
+        </div>
+        <div class="deploy-summary">${esc(d.summary)}</div>
+        <div class="card-meta" style="margin-top:5px">
+          ${rb}
+          <span class="card-time">${new Date(d.deployed_at).toLocaleString()}</span>
+        </div>`;
+      el.appendChild(div);
+    });
+  }
+
+  // ── Reports ───────────────────────────────────────────────────────────────
+  async function renderReports(el) {
+    const reports = await fetchJSON('/api/reports');
+    el.innerHTML = '';
+    if (!reports.length) {
+      el.innerHTML = '<div style="padding:14px;color:var(--muted);font-size:12px">No reports yet.<br>Run triage or audit to generate one.</div>';
+      return;
+    }
+    reports.forEach(r => {
+      const card = el.appendChild(mkCard());
+      const icon = r.name.startsWith('triage') ? '🔍' : '📋';
+      card.innerHTML = `<div class="card-id">${icon} Report</div>
+        <div class="card-title">${esc(r.name)}</div>`;
+      card.onclick = () => { activate(card); setViewer(r.name, r.content); };
+    });
+  }
+
+  // ── Viewer ────────────────────────────────────────────────────────────────
+  function setViewer(title, markdown) {
+    document.getElementById('viewer-title').textContent = title;
+    const body = document.getElementById('viewer-body');
+    body.innerHTML = `<div class="md">${marked.parse(markdown)}</div>`;
+    body.scrollTop = 0;
+  }
+
+  function activate(card) {
+    document.querySelectorAll('.resource-card').forEach(c => c.classList.remove('active'));
+    card.classList.add('active');
+  }
+
+  // ── Terminal ──────────────────────────────────────────────────────────────
+  function term(html) {
+    const el = document.getElementById('terminal');
+    el.insertAdjacentHTML('beforeend', html);
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function clearTerminal() {
+    document.getElementById('terminal').innerHTML = '';
+  }
+
+  // ── Agent runner ──────────────────────────────────────────────────────────
+  function setBusy(busy, label) {
+    isRunning = busy;
+    document.getElementById('pulse').className = 'pulse' + (busy ? ' running' : '');
+    document.getElementById('status').textContent = label;
+    ['btn-triage','btn-audit','btn-demo'].forEach(id =>
+      document.getElementById(id).disabled = busy
+    );
+  }
+
+  function runAgent(mode) {
+    if (isRunning) return;
+    const label = mode === 'triage' ? 'Triage running...' : 'Audit running...';
+    setBusy(true, label);
+    term(`<span class="t-meta">\n─── ${mode.toUpperCase()} STARTED ───\n\n</span>`);
+
+    const es = new EventSource(`/stream/${mode}`);
+
+    es.onmessage = e => {
+      const d = JSON.parse(e.data);
+
+      if (d.type === 'text') {
+        term(`<span class="t-text">${esc(d.content)}</span>`);
+
+      } else if (d.type === 'tool') {
+        term(`<span class="t-tool">\n  → ${esc(d.name)}(${esc(d.input)})\n</span>`);
+
+      } else if (d.type === 'result') {
+        term(`<span class="t-result">    ${esc(d.preview)}...\n</span>`);
+
+      } else if (d.type === 'done') {
+        term(`<span class="t-done">\n✓ ${mode} complete</span>`);
+        if (d.report) {
+          term(`<span class="t-done"> → ${esc(d.report)}\n</span>`);
+          autoLoadReport(d.report, mode);
+          if (currentTab === 'reports') loadTab('reports');
+        }
+        term('\n');
+        es.close();
+        setBusy(false, 'Idle');
+        if (afterRun) { const fn = afterRun; afterRun = null; setTimeout(fn, 1800); }
+
+      } else if (d.type === 'error') {
+        term(`<span class="t-error">\n✗ ${esc(d.message)}\n</span>`);
+        es.close();
+        setBusy(false, 'Error');
+        afterRun = null;
+
+      } else if (d.type === 'end') {
+        es.close();
+      }
+    };
+
+    es.onerror = () => {
+      term('<span class="t-error">\n✗ Connection lost\n</span>');
+      es.close();
+      setBusy(false, 'Error');
+      afterRun = null;
+    };
+  }
+
+  async function autoLoadReport(name, mode) {
+    try {
+      const reports = await fetchJSON('/api/reports');
+      const r = reports.find(x => x.name === name);
+      if (r) setViewer(r.name, r.content);
+    } catch {}
+  }
+
+  function runDemo() {
+    if (isRunning) return;
+    clearTerminal();
+    term('<span class="t-meta">─── FULL DEMO: TRIAGE + AUDIT ───\n\n</span>');
+    afterRun = () => runAgent('audit');
+    runAgent('triage');
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  async function fetchJSON(url) {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    return r.json();
+  }
+
+  function mkCard() {
+    const d = document.createElement('div');
+    d.className = 'resource-card';
+    return d;
+  }
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+</body>
+</html>
