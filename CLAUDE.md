@@ -291,10 +291,27 @@ These are P1 and P2 items. See ROADMAP.md.
 
 ## Environment setup
 
+The API key lives in `.env` at the repo root (already gitignored). The key name in that file is `api_key` (not `ANTHROPIC_API_KEY`). `main.py` loads it at startup via `python-dotenv` and passes it explicitly to the Anthropic client.
+
+**Do not export `ANTHROPIC_API_KEY` manually — the .env handles it.**
+
 ```bash
 cd always-on-agent/agent
-pip install -r requirements.txt     # anthropic>=0.30.0
-export ANTHROPIC_API_KEY=sk-ant-...
+pip install -r requirements.txt     # anthropic>=0.30.0, python-dotenv>=1.0.0
 python main.py triage
 python main.py audit
 ```
+
+The `.env` load pattern in `main.py`:
+```python
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=pathlib.Path(__file__).parent.parent / ".env")
+api_key = os.environ.get("api_key")
+```
+
+And passed to the client in `agent.py`:
+```python
+client = anthropic.Anthropic(api_key=api_key)
+```
+
+`api_key` is passed as a parameter from `main.py` → `run()` — not read from the environment inside `agent.py`.

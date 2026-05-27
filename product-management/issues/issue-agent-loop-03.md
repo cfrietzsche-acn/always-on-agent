@@ -16,13 +16,16 @@ As an operator, I want to run `python main.py triage` or `python main.py audit` 
 
 ## Acceptance Criteria
 
-- [ ] `agent/agent.py` exports a `run(mode, repo_root, model)` function
+- [ ] `agent/agent.py` exports a `run(mode, repo_root, api_key, model)` function
 - [ ] The loop follows the pattern: send → receive → if `tool_use`, dispatch all tool calls and append results as one `user`-role message → if `end_turn`, print final text and break
 - [ ] All tool results for a single turn are collected into one array and appended as one `user` message (never one message per result)
 - [ ] Each tool call is logged to stdout: `  → {tool_name}({input})`
 - [ ] `agent/main.py` accepts `triage` or `audit` as the subcommand; prints usage and exits for anything else
+- [ ] `main.py` loads `.env` from the repo root: `load_dotenv(dotenv_path=pathlib.Path(__file__).parent.parent / ".env")`
+- [ ] `main.py` reads `api_key = os.environ.get("api_key")` after loading `.env` and exits with a clear error if missing or empty
 - [ ] `main.py` resolves `REPO_ROOT` as the parent of the `agent/` directory using `pathlib.Path(__file__).parent.parent.resolve()`
 - [ ] `main.py` creates `agent/reports/` at startup if it doesn't exist
+- [ ] `agent.py` accepts `api_key` as a parameter and uses `anthropic.Anthropic(api_key=api_key)` — does not read from env directly
 - [ ] `python main.py triage` runs to completion without an API error or uncaught exception
 - [ ] A report file appears in `agent/reports/` after a successful run
 
@@ -56,11 +59,16 @@ After tool calls, append ONE user message containing ALL results:
 NOT one message per result. NOT an assistant-role message. ONE user message.
 ```
 
-`main.py` REPO_ROOT resolution:
+`main.py` env loading and REPO_ROOT resolution:
 ```python
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=pathlib.Path(__file__).parent.parent / ".env")
+api_key = os.environ.get("api_key")
+if not api_key:
+    print("Error: api_key not found in .env"); sys.exit(1)
 repo_root = str(pathlib.Path(__file__).parent.parent.resolve())
 ```
-This is the only acceptable approach — no `os.getcwd()`, no hardcoded paths.
+The `.env` at repo root uses the key name `api_key` (not `ANTHROPIC_API_KEY`). The Anthropic SDK does not auto-detect it — it must be passed explicitly. `api_key` is threaded through `run()` to `anthropic.Anthropic(api_key=api_key)`. No `export` command needed; no env var set in the shell.
 
 Date injection in `agent.py`:
 ```python

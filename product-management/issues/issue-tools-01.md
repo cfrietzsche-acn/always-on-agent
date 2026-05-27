@@ -38,6 +38,19 @@ As a developer wiring up the agent loop, I want all 9 tools implemented with cor
 
 ---
 
+## requirements.txt
+
+`agent/requirements.txt` is created in this sprint with exactly:
+
+```
+anthropic>=0.30.0
+python-dotenv>=1.0.0
+```
+
+`python-dotenv` is needed because the API key lives in `.env` at the repo root with the key name `api_key` (not `ANTHROPIC_API_KEY`). It must be loaded explicitly — the Anthropic SDK will not find it automatically.
+
+---
+
 ## SDM Technical Review
 
 **Verdict:** [x] Go
